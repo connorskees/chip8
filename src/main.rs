@@ -168,7 +168,7 @@ impl Emulator {
         let opcode = u16::from(self.memory[self.program_counter as usize]) << 8
             | u16::from(self.memory[self.program_counter as usize + 1]);
 
-        println!("{:#X}", opcode);
+        // println!("{:X}", opcode);
 
         match opcode & 0xF000 {
             0x0000 => match opcode & 0x00FF {
@@ -177,9 +177,8 @@ impl Emulator {
                 _ => todo!("{:#X}", opcode),
             },
             0x1000 => {
-                let address = opcode & 0x0FFF;
-
-                self.program_counter = address;
+                self.program_counter = opcode & 0x0FFF;
+                return;
             }
             0x2000 => todo!("{:#X}", opcode),
             0x3000 => {
@@ -209,16 +208,17 @@ impl Emulator {
                 let register = self.get_register_x_mut(opcode);
                 let value = opcode & 0x00FF;
 
-                *register = register.wrapping_add(u8::try_from(value).unwrap());
+                *register = ((*register as u16 + value) & 0x00FF) as u8;
             }
             0x8000 => match opcode & 0x000F {
+                0x0000 => todo!("{:#X}", opcode),
                 0x0001 => todo!("{:#X}", opcode),
                 0x0002 => {
                     let register_y = self.get_register_y(opcode);
 
                     let register_x = self.get_register_x_mut(opcode);
 
-                    *register_x = *register_x | register_y;
+                    *register_x &= register_y;
                 }
                 0x0003 => todo!("{:#X}", opcode),
                 0x0004 => {
@@ -226,7 +226,15 @@ impl Emulator {
 
                     let register_x = self.get_register_x_mut(opcode);
 
-                    *register_x = register_x.wrapping_add(register_y);
+                    let wrapped = register_x.wrapping_add(register_y);
+
+                    if register_x.checked_add(register_y).is_some() {
+                        *register_x = wrapped;
+                        self.registers[0xf] = 1;
+                    } else {
+                        *register_x = wrapped;
+                        self.registers[0xf] = 0;
+                    }
                 }
                 0x0005 => todo!("{:#X}", opcode),
                 0x0006 => todo!("{:#X}", opcode),
@@ -327,7 +335,7 @@ impl Emulator {
 
         if self.sound_timer > 0 {
             if self.sound_timer == 1 {
-                println!("Beep!");
+                // println!("Beep!");
             }
             self.sound_timer -= 1;
         }
